@@ -1,23 +1,33 @@
-name: Build Check
+name: ParkingLotSystem Build Check
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, master ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # 한 모듈이 실패해도 다른 모듈 빌드를 중단하지 않고 끝까지 검사
+      matrix:
+        module:
+          - EntryAndExit
+          - InfoMark
+          - ParkingDetect
 
     steps:
-    - uses: actions/checkout@v4
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
 
-    - name: Install Dependencies
-      run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi cmake ninja-build
+      - name: ARM 툴체인 및 CMake/Ninja 설치
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi cmake ninja-build build-essential
 
-    - name: Build
-      run: |
-        mkdir build && cd build
-        cmake ..
-        make
+      - name: ${{ matrix.module }} 빌드 수행
+        working-directory: ${{ matrix.module }}
+        run: |
+          cmake -B build -G Ninja
+          cmake --build build
