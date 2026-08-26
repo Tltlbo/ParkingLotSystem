@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "name": "STM32",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/InfoMark/Core/Inc",
+        "${workspaceFolder}/InfoMark/Drivers/STM32F4xx_HAL_Driver/Inc",
+        "${workspaceFolder}/InfoMark/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+        "${workspaceFolder}/InfoMark/Drivers/CMSIS/Include",
+        "${workspaceFolder}/InfoMark/MyApp/hw/driver"
+      ],
+      "defines": [
+        "USE_HAL_DRIVER",
+        "STM32F411xE"
+      ],
+      "cStandard": "c11",
+      "cppStandard": "c++14",
+      "intelliSenseMode": "gcc-arm",
+      "configurationProvider": "ms-vscode.cmake-tools"
+    }
+  ],
+  "version": 4
+}
