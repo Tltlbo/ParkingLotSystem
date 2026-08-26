@@ -2,10 +2,10 @@
   "cmake.cmakePath": "cube-cmake",
   "cmake.configureArgs": [
     "-DCMAKE_COMMAND=cube-cmake"
-  ],
+],
   "cmake.preferredGenerators": [
     "Ninja"
-  ],
+],
   "cmake.environment": {
     "PATH": "${env:CUBE_BUNDLE_PATH}/gnu-tools-for-stm32/14.3.1+st.2/bin;${env:PATH}"
   },
@@ -14,5 +14,5 @@
     "starm-clangd",
     "--query-driver=${env:CUBE_BUNDLE_PATH}/gnu-tools-for-stm32/14.3.1+st.2/bin/arm-none-eabi-gcc*",
     "--query-driver=${env:CUBE_BUNDLE_PATH}/gnu-tools-for-stm32/14.3.1+st.2/bin/arm-none-eabi-g++*"
-  ]
+]
 }
