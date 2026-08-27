@@ -1,5 +1,4 @@
-# include "main.h"
-
-void apMain(void);
+#include "main.h"
 
 void apInit(void);
+void apMain(void);
