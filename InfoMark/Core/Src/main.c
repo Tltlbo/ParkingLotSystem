@@ -2,96 +2,72 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
+  * @brief          : Main program body (Chat Display to Full LCD)
   ******************************************************************************
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "dma.h"
 #include "i2c.h"
 #include "usart.h"
 #include "gpio.h"
 
-
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "myLcd.h"
+#include <stdio.h>
+#include <string.h>
 /* USER CODE END Includes */
 
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
-
 /* Private variables ---------------------------------------------------------*/
-
 /* USER CODE BEGIN PV */
+#define RX_BUF_SIZE 64
+uint8_t rx_buf[RX_BUF_SIZE];        // Teleplot -> USART2 수신용 버퍼
+uint8_t tx_buf[RX_BUF_SIZE];        // USART2 -> 점퍼선 -> USART1 수신용 버퍼
 
+char lcd_display_buf[RX_BUF_SIZE];  // LCD 출력용 버퍼
+volatile uint8_t lcd_update_flag = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-/* USER CODE BEGIN PFP */
 
-/* USER CODE END PFP */
-
-/* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+int __io_putchar(int ch)
+{
+    HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 10);
+    return ch;
+}
 /* USER CODE END 0 */
 
-/**
-  * @brief  The application entry point.
-  * @retval int
-  */
 int main(void)
 {
-
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
   SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_I2C1_Init();
+  MX_DMA_Init();
   MX_USART2_UART_Init();
+  MX_I2C1_Init();
+  MX_USART1_UART_Init();
+
   /* USER CODE BEGIN 2 */
+
+  // 1. LCD 초기화
+  lcdInit(&hi2c1, I2C_LCD_ADDR);
+  lcdClear();
+  lcdSetCursor(0, 0);
+  lcdSendString("DMA Chat Ready!");
+
+  // 2. Teleplot 시작 안내
+  char init_msg[] = "\r\n[System] InfoMark DMA Pipeline Ready! Enter chat:\r\n";
+  HAL_UART_Transmit(&huart2, (uint8_t *)init_msg, strlen(init_msg), 100);
+
+  // 3. USART2, USART1 IDLE DMA 수신 시작
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, rx_buf, RX_BUF_SIZE);
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, tx_buf, RX_BUF_SIZE);
 
   /* USER CODE END 2 */
 
@@ -99,6 +75,32 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+      if (lcd_update_flag)
+      {
+          lcd_update_flag = 0;
+
+          // LCD 화면 클리어 후 새로운 채팅 출력
+          lcdClear();
+          HAL_Delay(5); // Clear 후 약간의 지연 필요
+
+          char line1[17] = {0};
+          char line2[17] = {0};
+
+          // 1번째 줄 출력 (최대 16자)
+          strncpy(line1, lcd_display_buf, 16);
+          lcdSetCursor(0, 0);
+          lcdSendString(line1);
+
+          // 16자를 넘으면 2번째 줄로 연결 출력
+          if (strlen(lcd_display_buf) > 16)
+          {
+              strncpy(line2, lcd_display_buf + 16, 16);
+              lcdSetCursor(1, 0);
+              lcdSendString(line2);
+          }
+
+          printf("\r\n[LCD Printed]: \"%s\"\r\n", lcd_display_buf);
+      }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -115,14 +117,9 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /** Configure the main internal regulator output voltage
-  */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-  /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
@@ -132,8 +129,6 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 
-  /** Initializes the CPU, AHB and APB buses clocks
-  */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
@@ -148,36 +143,47 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+    // [1단계] Teleplot(USART2) 수신 -> USART1(점퍼선)으로 송신
+    if (huart->Instance == USART2)
+    {
+        HAL_UART_DMAStop(&huart2);
 
+        // huart1으로 쏴주어야 USART1의 RX(PA10) DMA가 수신 완료를 감지함
+        HAL_UART_Transmit(&huart1, rx_buf, Size, 100);
+
+        memset(rx_buf, 0, Size);
+        HAL_UARTEx_ReceiveToIdle_DMA(&huart2, rx_buf, RX_BUF_SIZE);
+    }
+    // [2단계] 점퍼선을 통해 USART1 수신 완료 -> LCD 출력
+    else if (huart->Instance == USART1)
+    {
+        HAL_UART_DMAStop(&huart1);
+
+        // 끝의 \r, \n 제거
+        while (Size > 0 && (tx_buf[Size - 1] == '\r' || tx_buf[Size - 1] == '\n'))
+        {
+            Size--;
+        }
+
+        if (Size > 0)
+        {
+            memcpy(lcd_display_buf, tx_buf, Size);
+            lcd_display_buf[Size] = '\0';
+            lcd_update_flag = 1; // 화면 갱신 트리거
+        }
+
+        //memset(tx_buf, 0, sizeof(tx_buf));
+        HAL_UARTEx_ReceiveToIdle_DMA(&huart1, tx_buf, RX_BUF_SIZE);
+    }
+}
 /* USER CODE END 4 */
 
-/**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
 void Error_Handler(void)
 {
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)
   {
   }
-  /* USER CODE END Error_Handler_Debug */
 }
-#ifdef USE_FULL_ASSERT
-/**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t *file, uint32_t line)
-{
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
-}
-#endif /* USE_FULL_ASSERT */
