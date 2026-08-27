@@ -1,3 +1,63 @@
-build
+# ==========================================
+# 1. 빌드 산출물 (Build Artifacts)
+# ==========================================
+build/
+Build/
+Debug/
+Release/
+bin/
+obj/
+
+# 컴파일 산출물 및 바이너리
+*.o
+*.obj
+*.d
+*.elf
+*.bin
+*.hex
+*.map
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+
+# ==========================================
+# 2. STM32CubeMX & STM32CubeIDE 임시 파일
+# ==========================================
+# CubeMX 백업 및 로그
+*.bak
+*.log
+.mxproject.bak
+
+# STM32CubeIDE/Eclipse 메타데이터 (VS Code만 사용 시 불필요)
+.metadata/
+.settings/
+.project
+.cproject
+
+# ==========================================
+# 3. VS Code 설정 및 캐시
+# ==========================================
+# 프로젝트 공용 launch.json, tasks.json 등은 공유하되, 개인 설정/히스토리는 제외
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/c_cpp_properties.json
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# VS Code 임시/캐시 파일
+.history/
+*.code-workspace
+
+# ==========================================
+# 4. OS 및 에디터 임시 파일
+# ==========================================
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# STM32CubeMX temporary files
 mx.scratch
-!.settings
