@@ -3,13 +3,40 @@
 #include "sensorADC.h"
 #include "UARTTX.h"
 #include <stdio.h>
+#include "tim.h"
+#include "i2s.h"
+#define PWM_MID_DUTY        (PWM_ARR_MAX / 2)
 
-extern int32_t mic_dma_buf[AUDIO_BUF_SIZE * 2];
+extern int16_t mic_dma_buf[AUDIO_BUF_SIZE * 2];
 
 void appInit(void) {
+    // adcInit();
+    // commUartInit();
+    // audioInit();
+    // printf("=== Parking Detect & Audio Pass System Online ===\r\n");
     adcInit();
+    printf("step1: adc done\r\n");
+
     commUartInit();
-    audioInit();
+    printf("step2: uart done\r\n");
+
+    __HAL_TIM_SET_PRESCALER(&htim1, 0);
+    __HAL_TIM_SET_AUTORELOAD(&htim1, PWM_ARR_MAX);
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, PWM_MID_DUTY);
+    printf("step3: tim regs set\r\n");
+
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+    printf("step4: pwm start done\r\n");
+
+    __HAL_TIM_MOE_ENABLE(&htim1);
+    printf("step5: moe enable done\r\n");
+
+    HAL_TIM_Base_Start_IT(&htim1);
+    printf("step6: tim base it start done\r\n");
+
+    HAL_I2S_Receive_DMA(&hi2s2, (uint16_t *)mic_dma_buf, AUDIO_BUF_SIZE * 2);
+    printf("step7: i2s dma start done\r\n");
+
     printf("=== Parking Detect & Audio Pass System Online ===\r\n");
 }
 
@@ -26,6 +53,7 @@ void appMain(void) {
     if (now - prev_plot_tick >= 50) {
         prev_plot_tick = now;
         printf(">mic_peak:%ld\n>mic_sample:%d\n", audioGetPeakAmplitude(), audioGetLastSample());
+        printf("[MIC] w0=0x%08lX w1=0x%08lX\r\n", (uint32_t)mic_dma_buf[0], (uint32_t)mic_dma_buf[1]);
     }
 
     /* 3. 주차 슬롯 상태 취합 */

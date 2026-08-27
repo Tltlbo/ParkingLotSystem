@@ -7,7 +7,7 @@
 #define PWM_MID_DUTY        (PWM_ARR_MAX / 2) // 420
 
 /* 32비트 수신 버퍼 */
-int32_t mic_dma_buf[AUDIO_BUF_SIZE * 2];
+int16_t mic_dma_buf[AUDIO_BUF_SIZE * 2];
 
 /* 링 버퍼 */
 static int16_t audio_ring[RING_BUF_SIZE];
@@ -22,7 +22,7 @@ static volatile int16_t g_last_sample = 0;
  */
 static inline int16_t parse_sample(int32_t raw32) {
     /* 캡처된 실제 유효 PCM 데이터가 들어있는 하위 16비트 추출 */
-    return (int16_t)(raw32 & 0xFFFF);
+    return (int16_t)(raw32 >> 16);
 }
 
 /**
@@ -71,8 +71,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 void audioProcessHalf(void) {
     int32_t peak = 0;
-    for (int i = 0; i < AUDIO_BUF_SIZE; i++) {
-        int16_t sample = parse_sample(mic_dma_buf[i]);
+    /* L/R 인터리브 상태: mic_dma_buf[0]=L, [1]=R(0) 반복이므로 짝수 인덱스만 사용 */
+    for (int i = 0; i < AUDIO_BUF_SIZE; i += 2) {
+        int16_t sample = mic_dma_buf[i];   // 직접 사용, 시프트/마스크 불필요
 
         audio_ring[ring_head] = sample;
         ring_head = (ring_head + 1) % RING_BUF_SIZE;
@@ -81,13 +82,13 @@ void audioProcessHalf(void) {
         if (abs_v > peak) peak = abs_v;
     }
     g_peak_amplitude = peak;
-    g_last_sample = parse_sample(mic_dma_buf[0]);
+    g_last_sample = mic_dma_buf[0];
 }
 
 void audioProcessFull(void) {
     int32_t peak = 0;
-    for (int i = 0; i < AUDIO_BUF_SIZE; i++) {
-        int16_t sample = parse_sample(mic_dma_buf[AUDIO_BUF_SIZE + i]);
+    for (int i = 0; i < AUDIO_BUF_SIZE; i += 2) {
+        int16_t sample = mic_dma_buf[AUDIO_BUF_SIZE + i];
 
         audio_ring[ring_head] = sample;
         ring_head = (ring_head + 1) % RING_BUF_SIZE;
@@ -96,7 +97,7 @@ void audioProcessFull(void) {
         if (abs_v > peak) peak = abs_v;
     }
     g_peak_amplitude = peak;
-    g_last_sample = parse_sample(mic_dma_buf[AUDIO_BUF_SIZE]);
+    g_last_sample = mic_dma_buf[AUDIO_BUF_SIZE];
 }
 
 int32_t audioGetPeakAmplitude(void) { return g_peak_amplitude; }
