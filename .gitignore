@@ -58,3 +58,6 @@ obj/
 Thumbs.db
 *.swp
 *~
+
+# STM32CubeMX temporary files
+mx.scratch
