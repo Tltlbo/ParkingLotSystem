@@ -3,73 +3,97 @@
 #include "tim.h"
 #include <stdlib.h>
 
-/* I2S DMA 수신 버퍼 (32비트 단위) */
-static int32_t mic_dma_buf[AUDIO_BUF_SIZE * 2];
+#define RING_BUF_SIZE       2048
+#define PWM_MID_DUTY        (PWM_ARR_MAX / 2) // 420
+
+/* 32비트 수신 버퍼 */
+int32_t mic_dma_buf[AUDIO_BUF_SIZE * 2];
+
+/* 링 버퍼 */
+static int16_t audio_ring[RING_BUF_SIZE];
+static volatile uint16_t ring_head = 0;
+static volatile uint16_t ring_tail = 0;
 
 static volatile int32_t g_peak_amplitude = 0;
 static volatile int16_t g_last_sample = 0;
 
 /**
- * @brief INMP441 샘플(16비트 오디오)을 TIM1 PWM 듀티비(0 ~ 839)로 매핑
+ * @brief INMP441 실제 유효 16비트 오디오 추출 (바이트 정렬 보정)
  */
-static inline uint16_t pcm_to_pwm(int16_t sample) {
-    /* 마이크 입력 신호 증폭을 위해 4배 게인(Gain) 적용 */
-    int32_t amplified = (int32_t)sample * 4;
-
-    /* -32768 ~ +32767 범위를 0 ~ PWM_ARR_MAX (중앙값: 420)으로 변환 */
-    int32_t pwm_val = (amplified * (PWM_ARR_MAX / 2)) / 32768 + (PWM_ARR_MAX / 2);
-
-    if (pwm_val < 0) pwm_val = 0;
-    if (pwm_val > PWM_ARR_MAX) pwm_val = PWM_ARR_MAX;
-
-    return (uint16_t)pwm_val;
+static inline int16_t parse_sample(int32_t raw32) {
+    /* 캡처된 실제 유효 PCM 데이터가 들어있는 하위 16비트 추출 */
+    return (int16_t)(raw32 & 0xFFFF);
 }
 
-static inline int16_t parse_sample(int32_t raw32) {
-    return (int16_t)(raw32 >> 16);
+/**
+ * @brief 16비트 PCM -> TIM1 PWM 듀티비 변환
+ */
+static inline uint16_t pcm_to_pwm(int16_t sample) {
+    /* 클리핑 방지 및 적정 볼륨 스케일링 */
+    int32_t duty = ((int32_t)sample * (PWM_ARR_MAX / 2)) / 32768 + PWM_MID_DUTY;
+
+    if (duty < 0) duty = 0;
+    if (duty > PWM_ARR_MAX) duty = PWM_ARR_MAX;
+
+    return (uint16_t)duty;
 }
 
 void audioInit(void) {
-    /* 1. TIM1 설정 (84MHz 기준 Prescaler 0, ARR 839 -> 100kHz PWM 캐리어) */
     __HAL_TIM_SET_PRESCALER(&htim1, 0);
     __HAL_TIM_SET_AUTORELOAD(&htim1, PWM_ARR_MAX);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, PWM_ARR_MAX / 2);
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, PWM_MID_DUTY);
 
-    /* 2. TIM1 PWM 시작 및 출력 활성화 */
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
     __HAL_TIM_MOE_ENABLE(&htim1);
 
-    /* 3. I2S 마이크 수신 DMA 시작 (PWM DMA는 사용하지 않음) */
+    /* 100kHz 기본 타이머 인터럽트 활성화 */
+    HAL_TIM_Base_Start_IT(&htim1);
+
+    /* I2S DMA 수신 시작 */
     HAL_I2S_Receive_DMA(&hi2s2, (uint16_t *)mic_dma_buf, AUDIO_BUF_SIZE * 2);
 }
 
-/* 전반부 수신 처리 */
+/* 16.6kHz 속도로 스피커 출력 */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+    if (htim->Instance == TIM1) {
+        static uint8_t div_cnt = 0;
+        if (++div_cnt >= 6) {
+            div_cnt = 0;
+
+            if (ring_tail != ring_head) {
+                int16_t sample = audio_ring[ring_tail];
+                ring_tail = (ring_tail + 1) % RING_BUF_SIZE;
+                TIM1->CCR1 = pcm_to_pwm(sample);
+            }
+        }
+    }
+}
+
 void audioProcessHalf(void) {
     int32_t peak = 0;
     for (int i = 0; i < AUDIO_BUF_SIZE; i++) {
         int16_t sample = parse_sample(mic_dma_buf[i]);
 
-        /* 수음된 마지막 샘플의 듀티비를 PWM 레지스터에 실시간 반영 */
-        TIM1->CCR1 = pcm_to_pwm(sample);
+        audio_ring[ring_head] = sample;
+        ring_head = (ring_head + 1) % RING_BUF_SIZE;
 
-        int32_t abs_val = abs((int32_t)sample);
-        if (abs_val > peak) peak = abs_val;
+        int32_t abs_v = abs((int32_t)sample);
+        if (abs_v > peak) peak = abs_v;
     }
     g_peak_amplitude = peak;
     g_last_sample = parse_sample(mic_dma_buf[0]);
 }
 
-/* 후반부 수신 처리 */
 void audioProcessFull(void) {
     int32_t peak = 0;
     for (int i = 0; i < AUDIO_BUF_SIZE; i++) {
         int16_t sample = parse_sample(mic_dma_buf[AUDIO_BUF_SIZE + i]);
 
-        /* 수음된 마지막 샘플의 듀티비를 PWM 레지스터에 실시간 반영 */
-        TIM1->CCR1 = pcm_to_pwm(sample);
+        audio_ring[ring_head] = sample;
+        ring_head = (ring_head + 1) % RING_BUF_SIZE;
 
-        int32_t abs_val = abs((int32_t)sample);
-        if (abs_val > peak) peak = abs_val;
+        int32_t abs_v = abs((int32_t)sample);
+        if (abs_v > peak) peak = abs_v;
     }
     g_peak_amplitude = peak;
     g_last_sample = parse_sample(mic_dma_buf[AUDIO_BUF_SIZE]);
