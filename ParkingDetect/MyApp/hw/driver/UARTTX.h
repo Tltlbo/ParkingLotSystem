@@ -10,6 +10,7 @@
 #define AUDIO_PACKET_TOTAL   (2 + 2 + AUDIO_PAYLOAD_SIZE + 1) /* 총 261 바이트 */
 
 void commUartInit(void);
+void commUartProcessRx(void);
 void commUartSendParkingStatus(void);
 void commUartSendSlotEvent(ParkingSlotID_t slot, ParkingStatus_t status);
 

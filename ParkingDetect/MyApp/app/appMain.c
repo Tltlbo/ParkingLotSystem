@@ -102,6 +102,9 @@ void appMain(void) {
     /* 1. ADC DMA 주차 센서 업데이트 */
     adcUpdate();
 
+    /* 1.5 UART RX DMA 처리 (지속적으로 호출) */
+    commUartProcessRx();
+
     /* 2. Teleplot 파형 모니터링 (50ms 주기) */
     if (now - prev_plot_tick >= 50) {
         prev_plot_tick = now;

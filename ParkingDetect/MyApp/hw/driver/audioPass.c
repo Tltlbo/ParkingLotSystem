@@ -1,6 +1,7 @@
 #include "audioPass.h"
 #include "i2s.h"
 #include "tim.h"
+#include "UARTTX.h"
 #include <stdlib.h>
 
 #define RING_BUF_SIZE       2048
@@ -18,6 +19,13 @@ static volatile int32_t g_peak_amplitude = 0;
 static volatile int16_t g_last_sample = 0;
 
 static int16_t temp_mono_frame[AUDIO_FRAME_SAMPLES];
+
+void audioPushToRingBuffer(const int16_t *samples, uint16_t count) {
+    for (uint16_t i = 0; i < count; i++) {
+        audio_ring[ring_head] = samples[i];
+        ring_head = (ring_head + 1) % RING_BUF_SIZE;
+    }
+}
 
 /**
  * @brief INMP441 실제 유효 16비트 오디오 추출 (바이트 정렬 보정)
@@ -83,9 +91,6 @@ void audioProcessHalf(void) {
             sample = 0;
         }
 
-        audio_ring[ring_head] = sample;
-        ring_head = (ring_head + 1) % RING_BUF_SIZE;
-
         if (tx_idx < AUDIO_FRAME_SAMPLES) {
             temp_mono_frame[tx_idx++] = sample;
         }
@@ -95,6 +100,10 @@ void audioProcessHalf(void) {
     }
     g_peak_amplitude = peak;
     g_last_sample = mic_dma_buf[0];
+
+    if (tx_idx > 0) {
+        commUartSendAudioFrame(temp_mono_frame);
+    }
 }
 
 void audioProcessFull(void) {
@@ -109,9 +118,6 @@ void audioProcessFull(void) {
             sample = 0;
         }
 
-        audio_ring[ring_head] = sample;
-        ring_head = (ring_head + 1) % RING_BUF_SIZE;
-
         if (tx_idx < AUDIO_FRAME_SAMPLES) {
             temp_mono_frame[tx_idx++] = sample;
         }
@@ -121,6 +127,10 @@ void audioProcessFull(void) {
     }
     g_peak_amplitude = peak;
     g_last_sample = mic_dma_buf[AUDIO_BUF_SIZE];
+
+    if (tx_idx > 0) {
+        commUartSendAudioFrame(temp_mono_frame);
+    }
 }
 
 int32_t audioGetPeakAmplitude(void) { return g_peak_amplitude; }

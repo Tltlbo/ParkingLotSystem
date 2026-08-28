@@ -11,6 +11,7 @@
 void audioInit(void);
 void audioProcessHalf(void);
 void audioProcessFull(void);
+void audioPushToRingBuffer(const int16_t *samples, uint16_t count);
 
 int32_t audioGetPeakAmplitude(void);
 int16_t audioGetLastSample(void);
