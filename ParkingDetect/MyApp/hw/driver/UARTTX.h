@@ -5,11 +5,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/* 통신 모듈 초기화 */
+#define AUDIO_FRAME_SAMPLES   128  /* 1회 전송 모노 샘플 수 */
+#define AUDIO_PAYLOAD_SIZE   (AUDIO_FRAME_SAMPLES * 2) /* 256 바이트 */
+#define AUDIO_PACKET_TOTAL   (2 + 2 + AUDIO_PAYLOAD_SIZE + 1) /* 총 261 바이트 */
+
 void commUartInit(void);
-
-/* 6개 슬롯 상태 문자열 패킷 전송 ($PARK,A-01:1,A-02:0,...\n) */
 void commUartSendParkingStatus(void);
-
-/* 특정 슬롯 상태 변경 이벤트 단일 전송 (EVENT,A-01:OCCUPIED\n) */
 void commUartSendSlotEvent(ParkingSlotID_t slot, ParkingStatus_t status);
+
+/* 오디오 프레임 전송 함수 (헤더 패킹 + DMA 송신) */
+void commUartSendAudioFrame(const int16_t *pcm_samples);

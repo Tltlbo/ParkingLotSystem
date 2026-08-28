@@ -17,6 +17,8 @@ static volatile uint16_t ring_tail = 0;
 static volatile int32_t g_peak_amplitude = 0;
 static volatile int16_t g_last_sample = 0;
 
+static int16_t temp_mono_frame[AUDIO_FRAME_SAMPLES];
+
 /**
  * @brief INMP441 실제 유효 16비트 오디오 추출 (바이트 정렬 보정)
  */
@@ -69,29 +71,36 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
     }
 }
 
-void audioProcessHalf(void) {
-    // int32_t peak = 0;
-    // /* L/R 인터리브 상태: mic_dma_buf[0]=L, [1]=R(0) 반복이므로 짝수 인덱스만 사용 */
-    // for (int i = 0; i < AUDIO_BUF_SIZE; i += 2) {
-    //     int16_t sample = mic_dma_buf[i];   // 직접 사용, 시프트/마스크 불필요
-
-    //     audio_ring[ring_head] = sample;
-    //     ring_head = (ring_head + 1) % RING_BUF_SIZE;
-
-    //     int32_t abs_v = abs((int32_t)sample);
-    //     if (abs_v > peak) peak = abs_v;
-    // }
-    // g_peak_amplitude = peak;
-    // g_last_sample = mic_dma_buf[0];
-    int32_t peak = 0;
+// void audioProcessHalf(void) {
+//     int32_t peak = 0;
     
-    /* 버튼 상태 확인 (Pull-up 설정 시 눌렸을 때 GPIO_PIN_RESET) */
-    bool is_mic_active = (HAL_GPIO_ReadPin(USER_BTN_GPIO_Port, USER_BTN_Pin) == GPIO_PIN_RESET);
+//     /* 버튼 상태 확인 (Pull-up 설정 시 눌렸을 때 GPIO_PIN_RESET) */
+//     bool is_mic_active = (HAL_GPIO_ReadPin(USER_BTN_GPIO_Port, USER_BTN_Pin) == GPIO_PIN_RESET);
 
-    /* L/R 인터리브 상태: mic_dma_buf[0]=L, [1]=R(0) 반복이므로 짝수 인덱스만 사용 */
+//     /* L/R 인터리브 상태: mic_dma_buf[0]=L, [1]=R(0) 반복이므로 짝수 인덱스만 사용 */
+//     for (int i = 0; i < AUDIO_BUF_SIZE; i += 2) {
+//         /* 버튼을 누르면 실제 마이크 데이터, 떼면 0(무음) */
+//         int16_t sample = is_mic_active ? (int16_t)mic_dma_buf[i] : 0;
+
+//         audio_ring[ring_head] = sample;
+//         ring_head = (ring_head + 1) % RING_BUF_SIZE;
+
+//         int32_t abs_v = abs((int32_t)sample);
+//         if (abs_v > peak) peak = abs_v;
+//     }
+//     g_peak_amplitude = peak;
+//     g_last_sample = is_mic_active ? (int16_t)mic_dma_buf[0] : 0;
+// }
+
+void audioProcessHalf(void) {
+    int32_t peak = 0;
+    bool is_mic_active = (HAL_GPIO_ReadPin(USER_BTN_GPIO_Port, USER_BTN_Pin) == GPIO_PIN_RESET);
+    uint16_t tx_idx = 0;
+
     for (int i = 0; i < AUDIO_BUF_SIZE; i += 2) {
-        /* 버튼을 누르면 실제 마이크 데이터, 떼면 0(무음) */
         int16_t sample = is_mic_active ? (int16_t)mic_dma_buf[i] : 0;
+        
+        temp_mono_frame[tx_idx++] = sample;
 
         audio_ring[ring_head] = sample;
         ring_head = (ring_head + 1) % RING_BUF_SIZE;
@@ -101,29 +110,42 @@ void audioProcessHalf(void) {
     }
     g_peak_amplitude = peak;
     g_last_sample = is_mic_active ? (int16_t)mic_dma_buf[0] : 0;
+
+    /* 팩트체크 적용: 버튼이 눌려있을 때(is_mic_active가 참일 때)만 UART로 전송 */
+    if (is_mic_active) {
+        commUartSendAudioFrame(temp_mono_frame);
+    }
 }
 
+// void audioProcessFull(void) {
+//     int32_t peak = 0;
+
+//     /* 버튼 상태 확인 */
+//     bool is_mic_active = (HAL_GPIO_ReadPin(USER_BTN_GPIO_Port, USER_BTN_Pin) == GPIO_PIN_RESET);
+
+//     for (int i = 0; i < AUDIO_BUF_SIZE; i += 2) {
+//         /* 버튼을 누르면 실제 마이크 데이터, 떼면 0(무음) */
+//         int16_t sample = is_mic_active ? (int16_t)mic_dma_buf[AUDIO_BUF_SIZE + i] : 0;
+
+//         audio_ring[ring_head] = sample;
+//         ring_head = (ring_head + 1) % RING_BUF_SIZE;
+
+//         int32_t abs_v = abs((int32_t)sample);
+//         if (abs_v > peak) peak = abs_v;
+//     }
+//     g_peak_amplitude = peak;
+//     g_last_sample = is_mic_active ? (int16_t)mic_dma_buf[AUDIO_BUF_SIZE] : 0;
+// }
+
 void audioProcessFull(void) {
-    // int32_t peak = 0;
-    // for (int i = 0; i < AUDIO_BUF_SIZE; i += 2) {
-    //     int16_t sample = mic_dma_buf[AUDIO_BUF_SIZE + i];
-
-    //     audio_ring[ring_head] = sample;
-    //     ring_head = (ring_head + 1) % RING_BUF_SIZE;
-
-    //     int32_t abs_v = abs((int32_t)sample);
-    //     if (abs_v > peak) peak = abs_v;
-    // }
-    // g_peak_amplitude = peak;
-    // g_last_sample = mic_dma_buf[AUDIO_BUF_SIZE];
     int32_t peak = 0;
-
-    /* 버튼 상태 확인 */
     bool is_mic_active = (HAL_GPIO_ReadPin(USER_BTN_GPIO_Port, USER_BTN_Pin) == GPIO_PIN_RESET);
+    uint16_t tx_idx = 0;
 
     for (int i = 0; i < AUDIO_BUF_SIZE; i += 2) {
-        /* 버튼을 누르면 실제 마이크 데이터, 떼면 0(무음) */
         int16_t sample = is_mic_active ? (int16_t)mic_dma_buf[AUDIO_BUF_SIZE + i] : 0;
+        
+        temp_mono_frame[tx_idx++] = sample;
 
         audio_ring[ring_head] = sample;
         ring_head = (ring_head + 1) % RING_BUF_SIZE;
@@ -133,6 +155,11 @@ void audioProcessFull(void) {
     }
     g_peak_amplitude = peak;
     g_last_sample = is_mic_active ? (int16_t)mic_dma_buf[AUDIO_BUF_SIZE] : 0;
+
+    /* 팩트체크 적용: 버튼이 눌려있을 때만 UART로 전송 */
+    if (is_mic_active) {
+        commUartSendAudioFrame(temp_mono_frame);
+    }
 }
 
 int32_t audioGetPeakAmplitude(void) { return g_peak_amplitude; }
