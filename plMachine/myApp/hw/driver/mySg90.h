@@ -4,16 +4,16 @@
 #include "stm32f4xx_hal.h"
 #include <stdint.h>
 
-#define SG90_PULSE_0_DEG      500  // 0도 (500us, 닫힘)
-#define SG90_PULSE_90_DEG     1450 // 90도 (1450us, 열림)
-
 /*
- * [속도 프리셋 안내]
- * 1.5f : 약 0.63초 (빠르고 경쾌함)
- * 1.0f : 약 0.95초 (1초 내외 - 묵직하고 자연스러운 밸런스)
- * 0.63f: 약 1.50초 (실제 대형 차단기 느낌의 느리고 리얼한 연출)
+ * TIM4 클럭: 84MHz / 840 = 100kHz (1 tick = 10us)
+ * Period (ARR) = 2000 - 1 (20ms, 50Hz)
+ * 0도 (0.5ms = 500us)   : 50 ticks
+ * 90도 (1.45ms = 1450us): 145 ticks
  */
-#define SG90_SPEED_US_PER_MS  0.63f // 현재: 약 1.5초 설정
+#define SG90_PULSE_0_DEG      50   // 0도 (500us, 닫힘)
+#define SG90_PULSE_90_DEG     145  // 90도 (1450us, 열림)
+
+#define SG90_SPEED_TICKS_PER_MS  0.1f  // 1ms당 0.1 tick (95 ticks 이동에 약 1.0초 소요)
 
 #define SG90_DISTANCE_CONFIRM_COUNT  2     // 순환 측정 기준 2회 연속 감지 시 확정
 #define SG90_MIN_OPEN_HOLD_MS        1500  // 차단기 열림 완료 보장 및 최소 열림 유지 시간 (1.5초)

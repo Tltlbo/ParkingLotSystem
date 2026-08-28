@@ -1,4 +1,5 @@
 #include "mySg90.h"
+#include "myRgbLed.h"
 
 extern TIM_HandleTypeDef htim4;
 
@@ -53,7 +54,7 @@ static void SG90_UpdateSmoothMovement(uint32_t now)
 
     if (dt_ms > 100) dt_ms = 100; // 비정상 지연 클램핑
 
-    float step = SG90_SPEED_US_PER_MS * (float)dt_ms;
+    float step = SG90_SPEED_TICKS_PER_MS * (float)dt_ms;
 
     for (uint8_t i = 0; i < SG90_GATE_COUNT; i++) {
         if (s_gates[i].current_pulse < s_gates[i].target_pulse) {
@@ -88,6 +89,9 @@ void SG90_Init(void)
     for (uint8_t i = 0; i < 4; i++) {
         s_sensor_cnt[i] = 0;
     }
+
+    RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+    RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
 }
 
 void SG90_SetGateAngle(SG90_Gate_t gate, uint8_t angle)
@@ -117,22 +121,36 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
     switch (s_lane_state)
     {
         case LANE_STATE_IDLE:
+            RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+            RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
+
             if (s1_active) {
                 /* 1. 입차 시작: 센서 1 감지 -> 입차 차단기(PB8) 90도 열림 */
                 SG90_SetGateAngle(SG90_ENTRY_GATE, 90);
                 s_lane_state = LANE_STATE_ENTRY_OPEN;
                 s_lane_timer = now;
+
+                /* 1번(입구) LED: Green(진입 허용), 반대쪽 2번(출구) LED: 적색/주황색 점멸 경고 */
+                RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+                RgbLed_SetColor(RGB_LED_2, LED_COLOR_BLINK_RED_ORANGE);
             }
             else if (s4_active) {
                 /* 2. 출차 시작 (반대 방향): 센서 4 감지 -> 출차 차단기(PB9) 90도 열림 */
                 SG90_SetGateAngle(SG90_EXIT_GATE, 90);
                 s_lane_state = LANE_STATE_REV_EXIT_OPEN;
                 s_lane_timer = now;
+
+                /* 2번(출구) LED: Green(출차 허용), 반대쪽 1번(입구) LED: 적색/주황색 점멸 경고 */
+                RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
+                RgbLed_SetColor(RGB_LED_1, LED_COLOR_BLINK_RED_ORANGE);
             }
             break;
 
         /* ==================== 정방향: 입차 시퀀스 ==================== */
         case LANE_STATE_ENTRY_OPEN:
+            RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+            RgbLed_SetColor(RGB_LED_2, LED_COLOR_BLINK_RED_ORANGE);
+
             /* 입차 차단기가 완전히 열리고(최소 1.5초 유지), 센서 2 감지 시 닫힘 */
             if ((now - s_lane_timer >= SG90_MIN_OPEN_HOLD_MS) && !SG90_IsGateMoving(SG90_ENTRY_GATE) && s2_active) {
                 /* 센서 2 감지 -> 입차 차단기(PB8) 0도 닫힘 */
@@ -143,10 +161,15 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
             else if (now - s_lane_timer > SG90_LANE_TIMEOUT_MS) {
                 SG90_SetGateAngle(SG90_ENTRY_GATE, 0);
                 s_lane_state = LANE_STATE_IDLE;
+                RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+                RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
             }
             break;
 
         case LANE_STATE_ENTRY_CLOSE:
+            RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+            RgbLed_SetColor(RGB_LED_2, LED_COLOR_BLINK_RED_ORANGE);
+
             if (s3_active) {
                 /* 센서 3 감지 -> 출차 차단기(PB9) 90도 열림 */
                 SG90_SetGateAngle(SG90_EXIT_GATE, 90);
@@ -154,11 +177,17 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
                 s_lane_timer = now;
             }
             else if (now - s_lane_timer > SG90_LANE_TIMEOUT_MS) {
+                SG90_SetGateAngle(SG90_EXIT_GATE, 0);
                 s_lane_state = LANE_STATE_IDLE;
+                RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+                RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
             }
             break;
 
         case LANE_STATE_EXIT_OPEN:
+            RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+            RgbLed_SetColor(RGB_LED_2, LED_COLOR_BLINK_RED_ORANGE);
+
             /* 출차 차단기가 완전히 열리고(최소 1.5초 유지), 센서 4 감지 시 닫힘 */
             if ((now - s_lane_timer >= SG90_MIN_OPEN_HOLD_MS) && !SG90_IsGateMoving(SG90_EXIT_GATE) && s4_active) {
                 /* 센서 4 감지 -> 출차 차단기(PB9) 0도 닫힘 */
@@ -170,10 +199,15 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
             else if (now - s_lane_timer > SG90_LANE_TIMEOUT_MS) {
                 SG90_SetGateAngle(SG90_EXIT_GATE, 0);
                 s_lane_state = LANE_STATE_IDLE;
+                RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+                RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
             }
             break;
 
         case LANE_STATE_EXIT_CLOSE:
+            RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+            RgbLed_SetColor(RGB_LED_2, LED_COLOR_BLINK_RED_ORANGE);
+
             /* 차량이 완전히 나갈 때까지 차단기를 0도(닫힘)로 유지하며 대기 */
             /* 차가 센서 4에 머물러 있는 동안에는 절대 IDLE로 가지 않음 (다시 열림 방지) */
             if (!s4_active && !SG90_IsGateMoving(SG90_EXIT_GATE)) {
@@ -183,6 +217,8 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
                     /* 센서 4 완전 이탈 후 1초간 빈 상태 확인 -> 비로소 다음 진입 대기(IDLE) */
                     s_lane_state = LANE_STATE_IDLE;
                     s_clear_timer = 0;
+                    RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+                    RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
                 }
             } else {
                 s_clear_timer = 0; // 차가 센서 4에 머물고 있으면 계속 닫힘 대기 유지
@@ -191,6 +227,9 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
 
         /* ==================== 역방향: 출차 시퀀스 ==================== */
         case LANE_STATE_REV_EXIT_OPEN:
+            RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
+            RgbLed_SetColor(RGB_LED_1, LED_COLOR_BLINK_RED_ORANGE);
+
             /* 출차 차단기가 완전히 열리고(최소 1.5초 유지), 센서 3 감지 시 닫힘 */
             if ((now - s_lane_timer >= SG90_MIN_OPEN_HOLD_MS) && !SG90_IsGateMoving(SG90_EXIT_GATE) && s3_active) {
                 /* 센서 3 감지 -> 출차 차단기(PB9) 0도 닫힘 */
@@ -201,10 +240,15 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
             else if (now - s_lane_timer > SG90_LANE_TIMEOUT_MS) {
                 SG90_SetGateAngle(SG90_EXIT_GATE, 0);
                 s_lane_state = LANE_STATE_IDLE;
+                RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+                RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
             }
             break;
 
         case LANE_STATE_REV_EXIT_CLOSE:
+            RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
+            RgbLed_SetColor(RGB_LED_1, LED_COLOR_BLINK_RED_ORANGE);
+
             if (s2_active) {
                 /* 센서 2 감지 -> 입차 차단기(PB8) 90도 열림 */
                 SG90_SetGateAngle(SG90_ENTRY_GATE, 90);
@@ -212,11 +256,17 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
                 s_lane_timer = now;
             }
             else if (now - s_lane_timer > SG90_LANE_TIMEOUT_MS) {
+                SG90_SetGateAngle(SG90_ENTRY_GATE, 0);
                 s_lane_state = LANE_STATE_IDLE;
+                RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+                RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
             }
             break;
 
         case LANE_STATE_REV_ENTRY_OPEN:
+            RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
+            RgbLed_SetColor(RGB_LED_1, LED_COLOR_BLINK_RED_ORANGE);
+
             /* 입차 차단기가 완전히 열리고(최소 1.5초 유지), 센서 1 감지 시 닫힘 */
             if ((now - s_lane_timer >= SG90_MIN_OPEN_HOLD_MS) && !SG90_IsGateMoving(SG90_ENTRY_GATE) && s1_active) {
                 /* 센서 1 감지 -> 입차 차단기(PB8) 0도 닫힘 */
@@ -228,10 +278,15 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
             else if (now - s_lane_timer > SG90_LANE_TIMEOUT_MS) {
                 SG90_SetGateAngle(SG90_ENTRY_GATE, 0);
                 s_lane_state = LANE_STATE_IDLE;
+                RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+                RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
             }
             break;
 
         case LANE_STATE_REV_ENTRY_CLOSE:
+            RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
+            RgbLed_SetColor(RGB_LED_1, LED_COLOR_BLINK_RED_ORANGE);
+
             /* 출차 차량이 센서 1을 완전히 빠져나갈 때까지 차단기를 0도(닫힘)로 유지하며 대기 */
             /* 출차 후 센서 1 앞에 차가 멈춰 있어도 절대 다시 열리지 않음 */
             if (!s1_active && !SG90_IsGateMoving(SG90_ENTRY_GATE)) {
@@ -241,6 +296,8 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
                     /* 센서 1 완전 이탈 후 1초간 빈 상태 확인 -> 비로소 다음 진입 대기(IDLE) */
                     s_lane_state = LANE_STATE_IDLE;
                     s_clear_timer = 0;
+                    RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
+                    RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
                 }
             } else {
                 s_clear_timer = 0; // 차가 센서 1에 머물고 있으면 계속 닫힘 대기 유지

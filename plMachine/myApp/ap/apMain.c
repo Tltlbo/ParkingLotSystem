@@ -1,6 +1,7 @@
 #include "apMain.h"
 #include "mySg90.h"
 #include "myHcSr04.h"
+#include "myRgbLed.h"
 #include <stdio.h>
 
 #define DETECTION_THRESHOLD_CM  20   // 감지 임계 거리 (20cm)
@@ -45,18 +46,26 @@ void apInit(void)
     // 초음파 센서(HC-SR04) 4개 및 타이머 초기화
     hcSr04Init();
 
+    // RGB LED(입구 1번, 출구 2번) 초기화 (기본 상태: GREEN)
+    RgbLed_Init();
+
     // 주차 차단기 서보 모터(SG90) 및 FSM 초기화
     SG90_Init();
 
     printf("\r\n========================================\r\n");
     printf("   Parking Lot System Initialized\r\n");
     printf("   S1:PA6/PB10, S2:PA7/PB15, S3:PA9/PB14, S4:PA8/PB13\r\n");
+    printf("   LED1(Gate1): PA0(R)/PA1(G)/PA4(B)\r\n");
+    printf("   LED2(Gate2): PB0(R)/PC1(G)/PC0(B)\r\n");
     printf("========================================\r\n");
 }
 
 void apMain(void)
 {
     uint32_t current_tick = HAL_GetTick();
+
+    // 0. RGB LED 점멸/애니메이션 주기 업데이트
+    RgbLed_Update(current_tick);
 
     // 1. 센서 4개를 20ms 간격으로 1개씩 순환(Round-Robin) 측정하여 상호 초음파 간섭 방지
     if (current_tick - s_last_sensor_tick >= SENSOR_SAMPLE_PERIOD_MS)
@@ -80,7 +89,7 @@ void apMain(void)
         }
         s_sensor_channel = (s_sensor_channel + 1) % 4;
 
-        // 2. 주차 차단기 상태 머신 실행
+        // 2. 주차 차단기 상태 머신 실행 (상태에 따라 LED 색상 자동 제어)
         SG90_ProcessParkingLane(s_dist1, s_dist2, s_dist3, s_dist4, DETECTION_THRESHOLD_CM);
     }
 
@@ -88,7 +97,8 @@ void apMain(void)
     if (current_tick - s_last_debug_tick >= DEBUG_PRINT_PERIOD_MS)
     {
         s_last_debug_tick = current_tick;
-        printf("[Sensors] S1:%2dcm | S2:%2dcm | S3:%2dcm | S4:%2dcm | LaneState:%d\r\n",
-               s_dist1, s_dist2, s_dist3, s_dist4, SG90_GetLaneState());
+        printf("[Sensors] S1:%2dcm | S2:%2dcm | S3:%2dcm | S4:%2dcm | State:%d | LED1:%d | LED2:%d\r\n",
+               s_dist1, s_dist2, s_dist3, s_dist4, SG90_GetLaneState(),
+               RgbLed_GetColor(RGB_LED_1), RgbLed_GetColor(RGB_LED_2));
     }
 }
