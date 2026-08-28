@@ -3,10 +3,10 @@
 #include "main.h"
 #include <stdint.h>
 #include <stdbool.h>
-#include "UARTTX.h"
 
 #define AUDIO_BUF_SIZE      256   /* Ping-Pong 버퍼 하프 사이즈 */
 #define PWM_ARR_MAX         839   /* TIM1 Period (ARR) */
+#define AUDIO_FRAME_SAMPLES 128
 
 void audioInit(void);
 void audioProcessHalf(void);
