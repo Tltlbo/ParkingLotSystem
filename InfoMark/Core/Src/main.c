@@ -23,7 +23,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-#define RX_BUF_SIZE 64
+#define RX_BUF_SIZE 256
 uint8_t rx_buf[RX_BUF_SIZE];        // Teleplot -> USART2 수신용 버퍼
 uint8_t tx_buf[RX_BUF_SIZE];        // USART2 -> 점퍼선 -> USART1 수신용 버퍼
 
@@ -67,9 +67,11 @@ int main(void)
   char init_msg[] = "\r\n[System] InfoMark DMA Pipeline Ready! Enter chat:\r\n";
   HAL_UART_Transmit(&huart2, (uint8_t *)init_msg, strlen(init_msg), 100);
 
-  // 3. USART2, USART1 IDLE DMA 수신 시작
   HAL_UARTEx_ReceiveToIdle_DMA(&huart2, rx_buf, RX_BUF_SIZE);
+  __HAL_DMA_DISABLE_IT(huart2.hdmarx, DMA_IT_HT);
+
   HAL_UARTEx_ReceiveToIdle_DMA(&huart1, tx_buf, RX_BUF_SIZE);
+  __HAL_DMA_DISABLE_IT(huart1.hdmarx, DMA_IT_HT);
 
   /* USER CODE END 2 */
 
@@ -79,29 +81,6 @@ int main(void)
   {
       if (lcd_update_flag)
       {
-          // lcd_update_flag = 0;
-
-          // // LCD 화면 클리어 후 새로운 채팅 출력
-          // lcdClear();
-          // HAL_Delay(5); // Clear 후 약간의 지연 필요
-
-          // char line1[17] = {0};
-          // char line2[17] = {0};
-
-          // // 1번째 줄 출력 (최대 16자)
-          // strncpy(line1, lcd_display_buf, 16);
-          // lcdSetCursor(0, 0);
-          // lcdSendString(line1);
-
-          // // 16자를 넘으면 2번째 줄로 연결 출력
-          // if (strlen(lcd_display_buf) > 16)
-          // {
-          //     strncpy(line2, lcd_display_buf + 16, 16);
-          //     lcdSetCursor(1, 0);
-          //     lcdSendString(line2);
-          // }
-
-          // printf("\r\n[LCD Printed]: \"%s\"\r\n", lcd_display_buf);
         lcd_update_flag = 0;
         parkingLcdRender(parkingModelGetSystem());
       }
@@ -163,23 +142,6 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
     // [2단계] 점퍼선을 통해 USART1 수신 완료 -> LCD 출력
     else if (huart->Instance == USART1)
     {
-        // HAL_UART_DMAStop(&huart1);
-
-        // // 끝의 \r, \n 제거
-        // while (Size > 0 && (tx_buf[Size - 1] == '\r' || tx_buf[Size - 1] == '\n'))
-        // {
-        //     Size--;
-        // }
-
-        // if (Size > 0)
-        // {
-        //     memcpy(lcd_display_buf, tx_buf, Size);
-        //     lcd_display_buf[Size] = '\0';
-        //     lcd_update_flag = 1; // 화면 갱신 트리거
-        // }
-
-        // //memset(tx_buf, 0, sizeof(tx_buf));
-        // HAL_UARTEx_ReceiveToIdle_DMA(&huart1, tx_buf, RX_BUF_SIZE);
         while (Size > 0 && (tx_buf[Size - 1] == '\r' || tx_buf[Size - 1] == '\n')) {
             Size--;
         }
@@ -206,13 +168,19 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
     if (huart->Instance == USART1)
     {
         /* 오버런 등 에러 플래그 클리어 후 DMA 재시작 */
+        // __HAL_UART_CLEAR_OREFLAG(huart);
+        // HAL_UARTEx_ReceiveToIdle_DMA(&huart1, tx_buf, RX_BUF_SIZE);
         __HAL_UART_CLEAR_OREFLAG(huart);
         HAL_UARTEx_ReceiveToIdle_DMA(&huart1, tx_buf, RX_BUF_SIZE);
+        __HAL_DMA_DISABLE_IT(huart1.hdmarx, DMA_IT_HT);
     }
     else if (huart->Instance == USART2)
     {
+        // __HAL_UART_CLEAR_OREFLAG(huart);
+        // HAL_UARTEx_ReceiveToIdle_DMA(&huart2, rx_buf, RX_BUF_SIZE);
         __HAL_UART_CLEAR_OREFLAG(huart);
         HAL_UARTEx_ReceiveToIdle_DMA(&huart2, rx_buf, RX_BUF_SIZE);
+        __HAL_DMA_DISABLE_IT(huart2.hdmarx, DMA_IT_HT);
     }
 }
 
@@ -221,23 +189,38 @@ void parkingLcdRender(const ParkingSystem_t *sys) {
     char line2[17];
 
     /* 1번째 줄: 전체 빈자리 현황 (예: "Empty: 4 / 6") */
-    snprintf(line1, sizeof(line1), "PARK Empty:%u/%u", sys->empty_count, sys->total_count);
+    char temp_line1[32];
+    snprintf(temp_line1, sizeof(temp_line1), "PARK Empty:%u/%u", sys->empty_count, sys->total_count);
+    snprintf(line1, sizeof(line1), "%-16s", temp_line1);
 
     /* 2번째 줄: 각 구역별 슬롯 상태 요약 ('X': 주차됨, 'O': 빈자리) */
-    /* 예: "A: O X O O X O" */
-    int offset = snprintf(line2, sizeof(line2), "A:");
-    for (int i = 0; i < sys->total_count && offset < 16; i++) {
-        if (sys->slots[i].is_valid && sys->slots[i].section == 'A') {
-            offset += snprintf(line2 + offset, sizeof(line2) - offset, " %c", 
-                               sys->slots[i].is_occupied ? 'X' : 'O');
+    // /* 예: "A: O X O O X O" */
+    // int offset = snprintf(line2, sizeof(line2), "A:");
+    // for (int i = 0; i < sys->total_count && offset < 16; i++) {
+    //     if (sys->slots[i].is_valid && (sys->slots[i].section == 'A')) {
+    //         offset += snprintf(line2 + offset, sizeof(line2) - offset, " %c", 
+    //                            sys->slots[i].is_occupied ? 'X' : 'O');
+    //     }
+    // }
+
+    // /* 디버그 출력 또는 실제 LCD 드라이버 함수 호출 */
+    // printf("\r\n--- LCD DISPLAY --- \r\n");
+    // printf("Line 1: %s\r\n", line1);
+    // printf("Line 2: %s\r\n", line2);
+    // printf("-------------------\r\n");
+
+    char status_str[11] = {0};
+    for (int i = 0; i < sys->total_count && i < 10; i++) {
+        if (sys->slots[i].is_valid) {
+            status_str[i] = sys->slots[i].is_occupied ? 'X' : 'O';
+        } else {
+            status_str[i] = '-';
         }
     }
-
-    /* 디버그 출력 또는 실제 LCD 드라이버 함수 호출 */
-    printf("\r\n--- LCD DISPLAY --- \r\n");
-    printf("Line 1: %s\r\n", line1);
-    printf("Line 2: %s\r\n", line2);
-    printf("-------------------\r\n");
+    
+    char temp_line2[32];
+    snprintf(temp_line2, sizeof(temp_line2), "S:%s", status_str);
+    snprintf(line2, sizeof(line2), "%-16s", temp_line2);
 
     
     lcdSetCursor(0, 0);

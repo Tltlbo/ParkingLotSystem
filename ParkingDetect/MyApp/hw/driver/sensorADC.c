@@ -15,7 +15,11 @@ static const char *SLOT_NAMES[CDS_CHANNEL_COUNT] = {
     "A-03", /* PA4 */
     "A-04", /* PB0 */
     "A-05", /* PC0 */
-    "A-06"  /* PC1 */
+    "A-06",  /* PC1 */
+    "B-01", /* PA6 */
+    "B-02",
+    "C-01",
+    "C-02"
 };
 
 typedef struct {
@@ -23,7 +27,7 @@ typedef struct {
     uint8_t match_count;
 } ParkingSlot_t;
 
-static uint16_t adc_dma_buf[CDS_CHANNEL_COUNT] = {0};
+uint16_t adc_dma_buf[CDS_CHANNEL_COUNT] = {0};
 static volatile bool is_conv_done = false;
 static ParkingSlot_t parking_slots[CDS_CHANNEL_COUNT];
 

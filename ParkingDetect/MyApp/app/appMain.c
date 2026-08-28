@@ -8,6 +8,7 @@
 #define PWM_MID_DUTY        (PWM_ARR_MAX / 2)
 
 extern int16_t mic_dma_buf[AUDIO_BUF_SIZE * 2];
+extern uint16_t adc_dma_buf[CDS_CHANNEL_COUNT];
 
 void appInit(void) {
     // adcInit();
@@ -41,7 +42,7 @@ void appInit(void) {
 }
 
 void appMain(void) {
-    static uint8_t prev_slot_mask = 0xFF;
+    static uint16_t prev_slot_mask = 0xFFFF;
     static uint32_t prev_dbg_tick = 0;
     static uint32_t prev_plot_tick = 0;
     uint32_t now = HAL_GetTick();
@@ -53,11 +54,10 @@ void appMain(void) {
     if (now - prev_plot_tick >= 50) {
         prev_plot_tick = now;
         printf(">mic_peak:%ld\n>mic_sample:%d\n", audioGetPeakAmplitude(), audioGetLastSample());
-        printf("[MIC] w0=0x%08lX w1=0x%08lX\r\n", (uint32_t)mic_dma_buf[0], (uint32_t)mic_dma_buf[1]);
     }
 
     /* 3. 주차 슬롯 상태 취합 */
-    uint8_t current_slot_mask = 0;
+    uint16_t current_slot_mask = 0;
     for (int i = 0; i < CDS_CHANNEL_COUNT; i++) {
         if (adcIsOccupied((ParkingSlotID_t)i)) {
             current_slot_mask |= (1 << i);
@@ -74,10 +74,9 @@ void appMain(void) {
     /* 5. 500ms 주기 콘솔 디버그 출력 */
     if (now - prev_dbg_tick >= 500) {
         prev_dbg_tick = now;
-        printf("[MIC] Raw: 0x%08lX | Sample: %6d | Peak: %5ld | [SLOT] 0x%02X\r\n",
-               (uint32_t)mic_dma_buf[0],
-               audioGetLastSample(),
-               audioGetPeakAmplitude(),
-               current_slot_mask);
+        printf("[RAW] A1:%u A2:%u A3:%u A4:%u A5:%u A6:%u | B1(PA6):%u B2(PA7):%u | C1(PC2):%u C2(PC4):%u \r\n",
+       adc_dma_buf[0], adc_dma_buf[1], adc_dma_buf[2],
+       adc_dma_buf[3], adc_dma_buf[4], adc_dma_buf[5],
+       adc_dma_buf[6], adc_dma_buf[7], adc_dma_buf[8], adc_dma_buf[9]);
     }
 }

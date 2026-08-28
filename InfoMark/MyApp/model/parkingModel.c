@@ -19,6 +19,7 @@ bool parkingModelParsePacket(const char *packet_str) {
     }
 
     /* 원본 문자열 수정을 방지하기 위해 로컬 복사 */
+    printf("%s\n", packet_str);
     char temp_buf[256];
     strncpy(temp_buf, packet_str, sizeof(temp_buf) - 1);
     temp_buf[sizeof(temp_buf) - 1] = '\0';
