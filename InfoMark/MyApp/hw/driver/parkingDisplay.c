@@ -13,10 +13,15 @@ void parkingDisplayInit(I2C_HandleTypeDef *hi2c) {
 }
 
 // 특정 주차 슬롯을 그려주는 내부 함수
-static void drawSlot(uint8_t x, uint8_t y, const char *label, bool is_occupied) {
+static void drawSlot(uint8_t x, uint8_t y, const char *label, bool is_occupied, bool is_recommended) {
     // 1. 테두리 그리기
     ssd1306_DrawRect(x, y, SLOT_W, SLOT_H, White);
     
+    // 추천 자리인 경우 이중 테두리
+    if (is_recommended) {
+        ssd1306_DrawRect(x + 1, y + 1, SLOT_W - 2, SLOT_H - 2, White);
+    }
+
     // 2. 라벨 텍스트 그리기 (가운데 위쪽)
     ssd1306_SetCursor(x + 3, y + 2);
     // 라벨 출력
@@ -25,13 +30,17 @@ static void drawSlot(uint8_t x, uint8_t y, const char *label, bool is_occupied) 
     buf[3] = '\0';
     ssd1306_WriteString(buf, Font_6x8, White);
     
-    // 3. 점유 상태 그리기
+    // 3. 점유 상태 및 기호 그리기
+    ssd1306_SetCursor(x + 6, y + 10);
     if (is_occupied) {
-        // 주차됨(가운데를 채우거나 X 그리기)
-        ssd1306_FillRect(x + 2, y + 10, SLOT_W - 4, SLOT_H - 12, White);
+        // 주차 불가 (X 표시)
+        ssd1306_WriteChar('X', Font_6x8, White);
+    } else if (is_recommended) {
+        // 추천 자리 표시 (별 표시, '*')
+        ssd1306_WriteChar('*', Font_6x8, White);
     } else {
-        // 비어있음
-        // 빈자리 표시는 아무것도 안그림
+        // 주차 가능 자리 표시 (O 표시)
+        ssd1306_WriteChar('O', Font_6x8, White);
     }
 }
 
@@ -45,6 +54,58 @@ static bool getSlotOccupied(const ParkingSystem_t *sys, char section, uint8_t nu
         }
     }
     return false;
+}
+
+// 주차가 편한 자리인지 확인하는 함수 (양 옆에 차가 없는 경우)
+static bool is_easy_to_park(const ParkingSystem_t *sys, char section, uint8_t num) {
+    if (getSlotOccupied(sys, section, num)) return false;
+    
+    bool left_occ = false;
+    bool right_occ = false;
+    
+    if (section == 'A') {
+        if (num > 1) left_occ = getSlotOccupied(sys, 'A', num - 1);
+        if (num < 6) right_occ = getSlotOccupied(sys, 'A', num + 1);
+    } else if (section == 'B') {
+        if (num == 1) right_occ = getSlotOccupied(sys, 'B', 2);
+        if (num == 2) left_occ = getSlotOccupied(sys, 'B', 1);
+    } else if (section == 'C') {
+        if (num == 1) right_occ = getSlotOccupied(sys, 'C', 2);
+        if (num == 2) left_occ = getSlotOccupied(sys, 'C', 1);
+    }
+    
+    return (!left_occ && !right_occ);
+}
+
+// 슬롯이 추천 대상인지 확인하는 함수
+static bool is_slot_recommended(const ParkingSystem_t *sys, char section, uint8_t num) {
+    if (getSlotOccupied(sys, section, num)) return false;
+
+    // 1순위: A4, A5, A6 중 빈 자리 확인
+    bool p1_available = (!getSlotOccupied(sys, 'A', 4) || !getSlotOccupied(sys, 'A', 5) || !getSlotOccupied(sys, 'A', 6));
+
+    if (p1_available) {
+        return (section == 'A' && (num == 4 || num == 5 || num == 6));
+    }
+
+    // 2순위: 양 쪽에 차가 없는 주차하기 편한 자리 확인
+    bool p2_available = false;
+    for (int i = 1; i <= 6; i++) {
+        if (is_easy_to_park(sys, 'A', i)) { p2_available = true; break; }
+    }
+    if (!p2_available) {
+        for (int i = 1; i <= 2; i++) {
+            if (is_easy_to_park(sys, 'B', i)) { p2_available = true; break; }
+            if (is_easy_to_park(sys, 'C', i)) { p2_available = true; break; }
+        }
+    }
+
+    if (p2_available) {
+        return is_easy_to_park(sys, section, num);
+    }
+
+    // 1, 2순위 모두 없으면 남은 빈자리 추천
+    return true;
 }
 
 void parkingDisplayRenderSlots(const ParkingSystem_t *sys) {
@@ -66,7 +127,8 @@ void parkingDisplayRenderSlots(const ParkingSystem_t *sys) {
         char label[5];
         snprintf(label, sizeof(label), "A%d", num);
         bool is_occ = getSlotOccupied(sys, 'A', num);
-        drawSlot(x, 14, label, is_occ);
+        bool is_rec = is_slot_recommended(sys, 'A', num);
+        drawSlot(x, 14, label, is_occ, is_rec);
     }
     
     // 4. 중앙 주행 통로 라인 (점선: Y = 38)
@@ -81,7 +143,8 @@ void parkingDisplayRenderSlots(const ParkingSystem_t *sys) {
         char label[5];
         snprintf(label, sizeof(label), "B%d", num);
         bool is_occ = getSlotOccupied(sys, 'B', num);
-        drawSlot(x, 44, label, is_occ);
+        bool is_rec = is_slot_recommended(sys, 'B', num);
+        drawSlot(x, 44, label, is_occ, is_rec);
     }
     
     // 중앙 입구 (IN GATE)
@@ -96,7 +159,8 @@ void parkingDisplayRenderSlots(const ParkingSystem_t *sys) {
         char label[5];
         snprintf(label, sizeof(label), "C%d", num);
         bool is_occ = getSlotOccupied(sys, 'C', num);
-        drawSlot(x, 44, label, is_occ);
+        bool is_rec = is_slot_recommended(sys, 'C', num);
+        drawSlot(x, 44, label, is_occ, is_rec);
     }
     
     // 6. OLED 화면으로 전송

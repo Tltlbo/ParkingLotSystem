@@ -11,16 +11,16 @@ typedef struct {
 
 /* 각 슬롯별 임계값 설정 (밝을 때와 어두울 때의 중간값 기준, 히스테리시스 적용) */
 static const SlotThreshold_t SLOT_THRESHOLDS[CDS_CHANNEL_COUNT] = {
-    [SLOT_A01] = { .thresh_occupied = 1600, .thresh_empty = 1450 }, /* PA0 */
-    [SLOT_A02] = { .thresh_occupied = 1600, .thresh_empty = 1450 }, /* PA1 */
-    [SLOT_A03] = { .thresh_occupied = 1450, .thresh_empty = 1300 }, /* PA4 */
-    [SLOT_A04] = { .thresh_occupied = 1450, .thresh_empty = 1300 }, /* PB0 */
-    [SLOT_A05] = { .thresh_occupied = 1300, .thresh_empty = 1180 }, /* PC0 */
-    [SLOT_A06] = { .thresh_occupied = 1350, .thresh_empty = 1220 }, /* PC1 */
-    [SLOT_B01] = { .thresh_occupied = 3000, .thresh_empty = 2600 }, /* PA6: 밝을 때 2340, 어두울 때 3597 */
-    [SLOT_B02] = { .thresh_occupied = 2350, .thresh_empty = 2100 }, /* PA7: 밝을 때 1996, 어두울 때 2625 */
-    [SLOT_C01] = { .thresh_occupied = 1800, .thresh_empty = 1650 }, /* PC2 */
-    [SLOT_C02] = { .thresh_occupied = 1750, .thresh_empty = 1600 }  /* PC4 */
+    [SLOT_A01] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PA0 */
+    [SLOT_A02] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PA1 */
+    [SLOT_A03] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PA4 */
+    [SLOT_A04] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PB0 */
+    [SLOT_A05] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PC0 */
+    [SLOT_A06] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PC1 */
+    [SLOT_B01] = { .thresh_occupied = 800,  .thresh_empty = 500 }, /* PA6: 그래프 기준 (Occupied: ~500, Empty: ~1500+) */
+    [SLOT_B02] = { .thresh_occupied = 800,  .thresh_empty = 500 }, /* PA7: 그래프 기준 (Occupied: ~300, Empty: ~1400+) */
+    [SLOT_C01] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PC2 */
+    [SLOT_C02] = { .thresh_occupied = 800, .thresh_empty = 500 }  /* PC4 */
 };
 
 #define DEBOUNCE_COUNT      5
@@ -66,9 +66,13 @@ void adcUpdate(void) {
         uint16_t th_occ = SLOT_THRESHOLDS[i].thresh_occupied;
         uint16_t th_emp = SLOT_THRESHOLDS[i].thresh_empty;
 
+        /* 임계값 대소 관계에 따라 센서 하드웨어 방향성(Pull-up/Pull-down) 자동 감지 */
+        bool is_inverted = (th_occ < th_emp); // 값이 낮아질 때 점유(어두움)로 판정하는 경우
+
         /* 1. 현재 빈 자리(EMPTY)일 때 -> 진입(OCCUPIED) 감지 */
         if (parking_slots[i].status == PARKING_EMPTY) {
-            if (raw >= th_occ) {
+            bool condition = is_inverted ? (raw <= th_occ) : (raw >= th_occ);
+            if (condition) {
                 if (++parking_slots[i].match_count >= DEBOUNCE_COUNT) {
                     parking_slots[i].status = PARKING_OCCUPIED;
                     parking_slots[i].match_count = 0;
@@ -79,7 +83,8 @@ void adcUpdate(void) {
         }
         /* 2. 현재 주차 중(OCCUPIED)일 때 -> 출차(EMPTY) 감지 */
         else {
-            if (raw <= th_emp) {
+            bool condition = is_inverted ? (raw >= th_emp) : (raw <= th_emp);
+            if (condition) {
                 if (++parking_slots[i].match_count >= DEBOUNCE_COUNT) {
                     parking_slots[i].status = PARKING_EMPTY;
                     parking_slots[i].match_count = 0;

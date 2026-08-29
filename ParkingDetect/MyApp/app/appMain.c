@@ -51,11 +51,16 @@ void appMain(void) {
     /* 1.5 UART RX DMA 처리 (지속적으로 호출) */
     commUartProcessRx();
 
-    /* 2. Teleplot 파형 모니터링 (50ms 주기 - B01 ADC 그래프용) */
-    if (now - prev_plot_tick >= 50) {
+    /* 2. Teleplot 파형 모니터링 (100ms 주기 - 전체 슬롯 ADC 그래프용) */
+    if (now - prev_plot_tick >= 100) {
         prev_plot_tick = now;
-        // Teleplot 그래프를 보려면 아래 주석을 해제하세요
-        // printf(">B01_ADC:%u\n>B01_OCCUPIED:%d\n", adcGetCdsRaw(SLOT_B01), adcIsOccupied(SLOT_B01) ? 1 : 0);
+        // 모든 센서의 저항값(ADC Raw)을 Teleplot에 출력하여 튜닝할 수 있게 함
+        for (int i = 0; i < CDS_CHANNEL_COUNT; i++) {
+            ParkingSlotID_t slot = (ParkingSlotID_t)i;
+            const char* name = parkingGetSlotName(slot);
+            // "A-01"을 "A1_ADC" 형식으로 변환하여 출력 (이름 특수문자 방지)
+            printf(">%c%c_ADC:%u\n", name[0], name[3], adcGetCdsRaw(slot));
+        }
     }
 
     /* 3. 10개 슬롯 상태 취합 */
