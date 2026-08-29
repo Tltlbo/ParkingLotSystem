@@ -80,8 +80,18 @@ void commUartSendParkingStatus(void) {
     }
     snprintf(tx_buf + offset, sizeof(tx_buf) - offset, "\n");
 
-    /* 오디오 DMA 송신이 끝난 순간 빠르게 송신 (Timeout 5ms) */
-    HAL_UART_Transmit(&COMM_UART, (uint8_t *)tx_buf, (uint16_t)strlen(tx_buf), 50);
+    /* 오디오 DMA 수신을 방해하지 않도록 논블로킹으로 전송 시도 */
+    HAL_StatusTypeDef res = HAL_ERROR;
+    if (COMM_UART.gState == HAL_UART_STATE_READY) {
+        res = HAL_UART_Transmit(&COMM_UART, (uint8_t *)tx_buf, (uint16_t)strlen(tx_buf), 5);
+    }
+
+    /* UART1 전송 성공 여부 및 실제 전송된 패킷 콘솔 출력 */
+    if (res == HAL_OK) {
+        printf("[UART1 -> InfoMark] Sent OK (%d bytes):\r\n  >> %s\r\n", (int)strlen(tx_buf), tx_buf);
+    } else {
+        printf("[UART1 -> InfoMark] Send FAILED! (HAL Status: %d)\r\n", res);
+    }
 }
 
 void commUartSendSlotEvent(ParkingSlotID_t slot, ParkingStatus_t status) {
@@ -90,7 +100,9 @@ void commUartSendSlotEvent(ParkingSlotID_t slot, ParkingStatus_t status) {
              parkingGetSlotName(slot),
              (status == PARKING_OCCUPIED) ? "OCCUPIED" : "EMPTY");
 
-    HAL_UART_Transmit(&COMM_UART, (uint8_t *)tx_buf, (uint16_t)strlen(tx_buf), 5);
+    if (COMM_UART.gState == HAL_UART_STATE_READY) {
+        HAL_UART_Transmit(&COMM_UART, (uint8_t *)tx_buf, (uint16_t)strlen(tx_buf), 5);
+    }
 }
 
 static void commUartParseByte(uint8_t b) {
