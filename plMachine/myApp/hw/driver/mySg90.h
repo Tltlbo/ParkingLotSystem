@@ -7,13 +7,16 @@
 /*
  * TIM4 클럭: 84MHz / 840 = 100kHz (1 tick = 10us)
  * Period (ARR) = 2000 - 1 (20ms, 50Hz)
- * 0도 (0.5ms = 500us)   : 50 ticks
- * 90도 (1.45ms = 1450us): 145 ticks
+ * 90도 (1.50ms = 1500us): 150 ticks (닫힘 초기값)
+ * 0도  (0.50ms = 500us) : 50 ticks  (열림 동작값)
  */
-#define SG90_PULSE_0_DEG      50   // 0도 (500us, 닫힘)
-#define SG90_PULSE_90_DEG     145  // 90도 (1450us, 열림)
+#define SG90_PULSE_90_DEG        150  // 90도 (닫힘 기본 위치 / 초기값)
+#define SG90_PULSE_0_DEG         50   // 0도 (열림 동작 위치)
 
-#define SG90_SPEED_TICKS_PER_MS  0.1f  // 1ms당 0.1 tick (95 ticks 이동에 약 1.0초 소요)
+#define GATE_ANGLE_CLOSE         90   // 차단기 닫힘 각도 (90도)
+#define GATE_ANGLE_OPEN          0    // 차단기 열림 각도 (0도)
+
+#define SG90_SPEED_TICKS_PER_MS  0.1f // 1ms당 0.1 tick (100 ticks 이동에 약 1.0초 소요)
 
 #define SG90_DISTANCE_CONFIRM_COUNT  2     // 순환 측정 기준 2회 연속 감지 시 확정
 #define SG90_MIN_OPEN_HOLD_MS        1500  // 차단기 열림 완료 보장 및 최소 열림 유지 시간 (1.5초)
@@ -43,3 +46,4 @@ void SG90_Init(void);
 void SG90_SetGateAngle(SG90_Gate_t gate, uint8_t angle);
 void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4, uint16_t threshold_cm);
 LaneState_t SG90_GetLaneState(void);
+int8_t SG90_GetLaneCount(void);

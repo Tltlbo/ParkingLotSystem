@@ -4,9 +4,10 @@
 #include "myRgbLed.h"
 #include <stdio.h>
 
-#define DETECTION_THRESHOLD_CM  20   // 감지 임계 거리 (20cm)
-#define SENSOR_SAMPLE_PERIOD_MS 20   // 각 센서 측정 주기 (20ms 간격 순환)
-#define DEBUG_PRINT_PERIOD_MS   300  // UART 디버그 출력 주기 (300ms)
+#define DETECTION_THRESHOLD_CM     15   // 감지 임계 거리 (15cm)
+#define SENSOR_TRIGGER_INTERVAL_MS 60   // HC-SR04 권장 트리거 인터벌 (60ms ~ 100ms, 잔여 에코 간섭 방지)
+#define FSM_PROCESS_PERIOD_MS      10   // 서보 모터 스무스 이동 및 FSM 제어 주기 (10ms)
+#define DEBUG_PRINT_PERIOD_MS      300  // UART 디버그 출력 주기 (300ms)
 
 extern UART_HandleTypeDef huart2;
 
@@ -23,8 +24,9 @@ static uint16_t s_dist2 = 0; // 센서 2 (입구 내부) - Trig: PA7, Echo: PB15
 static uint16_t s_dist3 = 0; // 센서 3 (출구 내부) - Trig: PA9, Echo: PB14
 static uint16_t s_dist4 = 0; // 센서 4 (출구 외부) - Trig: PA8, Echo: PB13
 
-// 주기 제어 타이머
+// 주기 제어 타이머 (HAL_GetTick 기반 Non-blocking)
 static uint32_t s_last_sensor_tick = 0;
+static uint32_t s_last_fsm_tick = 0;
 static uint32_t s_last_debug_tick = 0;
 static uint8_t  s_sensor_channel = 0;
 
@@ -57,6 +59,7 @@ void apInit(void)
     printf("   S1:PA6/PB10, S2:PA7/PB15, S3:PA9/PB14, S4:PA8/PB13\r\n");
     printf("   LED1(Gate1): PA0(R)/PA1(G)/PA4(B)\r\n");
     printf("   LED2(Gate2): PB0(R)/PC1(G)/PC0(B)\r\n");
+    printf("   HC-SR04 Trigger Interval: %d ms\r\n", SENSOR_TRIGGER_INTERVAL_MS);
     printf("========================================\r\n");
 }
 
@@ -64,11 +67,12 @@ void apMain(void)
 {
     uint32_t current_tick = HAL_GetTick();
 
-    // 0. RGB LED 점멸/애니메이션 주기 업데이트
+    // 0. RGB LED 점멸/애니메이션 주기 업데이트 (Non-blocking)
     RgbLed_Update(current_tick);
 
-    // 1. 센서 4개를 20ms 간격으로 1개씩 순환(Round-Robin) 측정하여 상호 초음파 간섭 방지
-    if (current_tick - s_last_sensor_tick >= SENSOR_SAMPLE_PERIOD_MS)
+    // 1. 초음파 센서 4개를 60ms 간격으로 1개씩 순환(Round-Robin) 트리거 및 측정
+    //    (HAL_Delay 없이 HAL_GetTick 기반 논블로킹으로 잔여 초음파 간섭 방지)
+    if (current_tick - s_last_sensor_tick >= SENSOR_TRIGGER_INTERVAL_MS)
     {
         s_last_sensor_tick = current_tick;
 
@@ -88,8 +92,12 @@ void apMain(void)
                 break;
         }
         s_sensor_channel = (s_sensor_channel + 1) % 4;
+    }
 
-        // 2. 주차 차단기 상태 머신 실행 (상태에 따라 LED 색상 자동 제어)
+    // 2. 주차 차단기 모터 스무스 이동 및 FSM 제어 (10ms 주기)
+    if (current_tick - s_last_fsm_tick >= FSM_PROCESS_PERIOD_MS)
+    {
+        s_last_fsm_tick = current_tick;
         SG90_ProcessParkingLane(s_dist1, s_dist2, s_dist3, s_dist4, DETECTION_THRESHOLD_CM);
     }
 
@@ -97,8 +105,8 @@ void apMain(void)
     if (current_tick - s_last_debug_tick >= DEBUG_PRINT_PERIOD_MS)
     {
         s_last_debug_tick = current_tick;
-        printf("[Sensors] S1:%2dcm | S2:%2dcm | S3:%2dcm | S4:%2dcm | State:%d | LED1:%d | LED2:%d\r\n",
-               s_dist1, s_dist2, s_dist3, s_dist4, SG90_GetLaneState(),
+        printf("[Sensors] S1:%2dcm | S2:%2dcm | S3:%2dcm | S4:%2dcm | State:%d | Count:%2d | LED1:%d | LED2:%d\r\n",
+               s_dist1, s_dist2, s_dist3, s_dist4, SG90_GetLaneState(), SG90_GetLaneCount(),
                RgbLed_GetColor(RGB_LED_1), RgbLed_GetColor(RGB_LED_2));
     }
 }
