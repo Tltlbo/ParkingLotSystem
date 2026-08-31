@@ -4,19 +4,18 @@
 #include "myRgbLed.h"
 #include <stdio.h>
 
-#define DETECTION_THRESHOLD_CM     15   // 감지 임계 거리 (15cm)
+#define DETECTION_THRESHOLD_CM     10   // 감지 임계 거리 (10cm)
 #define SENSOR_TRIGGER_INTERVAL_MS 60   // HC-SR04 권장 트리거 인터벌 (60ms ~ 100ms, 잔여 에코 간섭 방지)
 #define FSM_PROCESS_PERIOD_MS      10   // 서보 모터 스무스 이동 및 FSM 제어 주기 (10ms)
 #define DEBUG_PRINT_PERIOD_MS      300  // UART 디버그 출력 주기 (300ms)
 
-extern UART_HandleTypeDef huart2;
-
-// printf 출력을 UART2(ST-Link 가상 COM 포트)로 리다이렉트
+// printf 출력용 스텁 (UART 미사용 시 더미 처리)
 int __io_putchar(int ch)
 {
-    HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 0xFFFF);
+    (void)ch;
     return ch;
 }
+
 
 // 센서별 최신 측정 거리 저장 변수
 static uint16_t s_dist1 = 0; // 센서 1 (입구 외부) - Trig: PA6, Echo: PB10
@@ -109,4 +108,4 @@ void apMain(void)
                s_dist1, s_dist2, s_dist3, s_dist4, SG90_GetLaneState(), SG90_GetLaneCount(),
                RgbLed_GetColor(RGB_LED_1), RgbLed_GetColor(RGB_LED_2));
     }
-}
+}

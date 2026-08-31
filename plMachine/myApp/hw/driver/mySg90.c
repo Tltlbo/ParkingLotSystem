@@ -23,6 +23,7 @@ static uint32_t s_last_servo_tick = 0;
 static uint32_t s_no_sensor_tick = 0;
 static uint8_t s_sensor_cnt[4] = {0, 0, 0, 0};
 static uint8_t s_prev_s[4] = {0, 0, 0, 0};
+static uint8_t s_s1_lock = 0; // 버튼 수동 입차 시 센서1 중복 카운트 방지 잠금 플래그
 
 static uint8_t SG90_IsGateMoving(SG90_Gate_t gate)
 {
@@ -118,6 +119,7 @@ void SG90_Init(void)
     s_clear_timer = 0;
     s_last_servo_tick = 0;
     s_no_sensor_tick = 0;
+    s_s1_lock = 0;
     for (uint8_t i = 0; i < 4; i++) {
         s_sensor_cnt[i] = 0;
         s_prev_s[i] = 0;
@@ -212,6 +214,7 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
             {
                 /* 센서 2 미감지로 차는 들어갔는데 안 닫힐 때 -> 버튼 누르면 모터 닫힘, 카운트 변화 없음 */
                 SG90_SetGateAngle(SG90_ENTRY_GATE, GATE_ANGLE_CLOSE);
+                s_s1_lock = 0;
             }
             else
             {
@@ -221,6 +224,7 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
                     s_lane_count++;
                 }
                 s_lane_timer = now;
+                s_s1_lock = 1; // ⭐ S1 잠금: 수동 진입 뒤차의 S1 최초 감지 엣지 중복 카운트 방지
             }
         }
         // ---------------------------------------------------------------------
@@ -232,6 +236,7 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
             {
                 /* 센서 2 미감지로 차는 들어갔는데 안 닫힐 때 -> 버튼 누르면 모터 닫힘, 카운트 변화 없음 */
                 SG90_SetGateAngle(SG90_ENTRY_GATE, GATE_ANGLE_CLOSE);
+                s_s1_lock = 0;
             }
             else
             {
@@ -240,6 +245,7 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
                 s_lane_count = 1;
                 s_lane_state = LANE_STATE_ENTRY_OPEN;
                 s_lane_timer = now;
+                s_s1_lock = 1; // ⭐ S1 잠금: 버튼으로 진입한 차량의 S1 최초 감지 엣지 중복 카운트 방지
             }
         }
     }
@@ -251,6 +257,7 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
             RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
             RgbLed_SetColor(RGB_LED_2, LED_COLOR_GREEN);
             s_lane_count = 0;
+            s_s1_lock = 0;
 
             if (s1_active) {
                 /* 정방향 입차 시작 (Count = 1) */
@@ -277,11 +284,19 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
             RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
             RgbLed_SetColor(RGB_LED_2, LED_COLOR_BLINK_RED_YELLOW);
 
+            /* 버튼으로 진입한 차량이 S1을 완전히 빠져나가거나 S2에 도달하면 S1 잠금 해제 */
+            if (s_s1_lock && (s1_falling || s2_active)) {
+                s_s1_lock = 0;
+            }
+
             /* [입차 차단기 1번 제어 및 S1 감지 시 카운트 증가] */
             if (s1_rising) {
                 // 새로운 뒤차가 S1에 도착하여 감지되는 순간 카운트 1 증가 & 차단기 열림
-                if (s_lane_count < 5) {
-                    s_lane_count++;
+                // (버튼 진입으로 S1이 잠겨있는 동안에는 중복 카운트 방지를 위해 스킵)
+                if (!s_s1_lock) {
+                    if (s_lane_count < 5) {
+                        s_lane_count++;
+                    }
                 }
                 SG90_SetGateAngle(SG90_ENTRY_GATE, GATE_ANGLE_OPEN);
                 s_lane_timer = now;
@@ -407,6 +422,7 @@ void SG90_ProcessParkingLane(uint16_t d1, uint16_t d2, uint16_t d3, uint16_t d4,
             // 15초간 통로 내 움직임이 없으면 강제 영점 및 IDLE 복구
             s_lane_count = 0;
             s_lane_state = LANE_STATE_IDLE;
+            s_s1_lock = 0;
             SG90_SetGateAngle(SG90_ENTRY_GATE, GATE_ANGLE_CLOSE);
             SG90_SetGateAngle(SG90_EXIT_GATE, GATE_ANGLE_CLOSE);
             RgbLed_SetColor(RGB_LED_1, LED_COLOR_GREEN);
