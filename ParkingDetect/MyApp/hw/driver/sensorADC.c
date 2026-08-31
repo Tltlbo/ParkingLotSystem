@@ -11,16 +11,16 @@ typedef struct {
 
 /* 각 슬롯별 임계값 설정 (밝을 때와 어두울 때의 중간값 기준, 히스테리시스 적용) */
 static const SlotThreshold_t SLOT_THRESHOLDS[CDS_CHANNEL_COUNT] = {
-    [SLOT_A01] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PA0 */
-    [SLOT_A02] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PA1 */
-    [SLOT_A03] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PA4 */
-    [SLOT_A04] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PB0 */
-    [SLOT_A05] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PC0 */
-    [SLOT_A06] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PC1 */
-    [SLOT_B01] = { .thresh_occupied = 800,  .thresh_empty = 500 }, /* PA6: 그래프 기준 (Occupied: ~500, Empty: ~1500+) */
-    [SLOT_B02] = { .thresh_occupied = 800,  .thresh_empty = 500 }, /* PA7: 그래프 기준 (Occupied: ~300, Empty: ~1400+) */
-    [SLOT_C01] = { .thresh_occupied = 800, .thresh_empty = 500 }, /* PC2 */
-    [SLOT_C02] = { .thresh_occupied = 800, .thresh_empty = 500 }  /* PC4 */
+    [SLOT_A01] = { .thresh_occupied = 1100, .thresh_empty = 800 }, /* PA0 */
+    [SLOT_A02] = { .thresh_occupied = 600, .thresh_empty = 400 }, /* PA1 */
+    [SLOT_A03] = { .thresh_occupied = 900, .thresh_empty = 650 }, /* PA4 */
+    [SLOT_A04] = { .thresh_occupied = 700, .thresh_empty = 450 }, /* PB0 */
+    [SLOT_A05] = { .thresh_occupied = 900, .thresh_empty = 600 }, /* PC0 */
+    [SLOT_A06] = { .thresh_occupied = 700, .thresh_empty = 450 }, /* PC1 */
+    [SLOT_B01] = { .thresh_occupied = 800,  .thresh_empty = 450 }, /* PA6: 그래프 기준 (Occupied: ~500, Empty: ~1500+) */
+    [SLOT_B02] = { .thresh_occupied = 600,  .thresh_empty = 450 }, /* PA7: 그래프 기준 (Occupied: ~300, Empty: ~1400+) */
+    [SLOT_C01] = { .thresh_occupied = 850, .thresh_empty = 450 }, /* PC2 */
+    [SLOT_C02] = { .thresh_occupied = 800, .thresh_empty = 450 }  /* PC4 */
 };
 
 #define DEBOUNCE_COUNT      5

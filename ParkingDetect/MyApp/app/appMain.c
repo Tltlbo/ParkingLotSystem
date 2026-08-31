@@ -51,9 +51,14 @@ void appMain(void) {
     /* 1.5 UART RX DMA 처리 (지속적으로 호출) */
     commUartProcessRx();
 
-    /* 2. Teleplot 파형 모니터링 (100ms 주기 - 전체 슬롯 ADC 그래프용) */
+    /* 2. Teleplot 파형 모니터링 (100ms 주기 - 전체 슬롯 ADC 및 버튼 상태 출력) */
     if (now - prev_plot_tick >= 100) {
         prev_plot_tick = now;
+        
+        // 버튼 상태 Teleplot 출력 (눌리면 1, 안 눌리면 0)
+        bool is_btn_pressed = (HAL_GPIO_ReadPin(USER_BTN_GPIO_Port, USER_BTN_Pin) == GPIO_PIN_RESET);
+        printf(">BTN_State:%d\n", is_btn_pressed ? 1 : 0);
+
         // 모든 센서의 저항값(ADC Raw)을 Teleplot에 출력하여 튜닝할 수 있게 함
         for (int i = 0; i < CDS_CHANNEL_COUNT; i++) {
             ParkingSlotID_t slot = (ParkingSlotID_t)i;
