@@ -4,7 +4,7 @@
 
 현대 사회의 심화되는 주차난과 주차장 이용의 불편함을 해소하기 위해 기획된 **스마트 주차 관리 시스템**입니다. 초음파 센서 기반의 주차 공간 감지, 2중 차단기 인터록(Interlock) 제어, 비상 인터폰 시스템 및 실시간 주차 위치 추천 알고리즘을 통합하여 효율적이고 안전한 주차 환경을 제공합니다.
 
- |<img width="1024" height="1024" alt="IMG_3749" src="https://github.com/user-attachments/assets/1b5e0d66-8778-4f56-a22a-ffd2cf9da28c" />
+ <img width="1024" height="1024" alt="IMG_3749" src="https://github.com/user-attachments/assets/1b5e0d66-8778-4f56-a22a-ffd2cf9da28c" />
 
 ## 👥 팀원 및 역할 분담 (Team Roles)
 - **박진성 (팀장):** 주차 자리 감지 구현, UART 송수신 파이프라인 및 인터폰 기능 구현
