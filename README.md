@@ -1,3 +1,4 @@
+
 # 🚗 스마트 주차 관리 시스템 (Smart Parking Management System)
 
 현대 사회의 심화되는 주차난과 주차장 이용의 불편함을 해소하기 위해 기획된 **스마트 주차 관리 시스템**입니다. 초음파 센서 기반의 주차 공간 감지, 2중 차단기 인터록(Interlock) 제어, 비상 인터폰 시스템 및 실시간 주차 위치 추천 알고리즘을 통합하여 효율적이고 안전한 주차 환경을 제공합니다.
@@ -20,7 +21,8 @@
 - **USART1 (보드 간 통신):** `PA10` (RX), `PA9` (TX)
 - **USART2 (디버그 통신):** `PA2` (TX), `PA3` (RX)
 
-![InfoMark Pinout](C:/Users/kccistc/.gemini/antigravity-ide/brain/f4e4f954-744f-4035-8dd3-43e5f84abc04/infomark_board_1788313444978.jpg)
+
+![InfoMark Pinout]<img width="1024" height="1024" alt="infomark_board_1788313444978" src="https://github.com/user-attachments/assets/2df8991a-46a3-44ba-8c16-b9515511d609" />
 
 ### 2. ParkingDetect 보드 (주차 자리 감지 및 메인 오디오 제어)
 각 주차면의 상태를 아날로그 센서로 읽어들이고, 비상 인터폰용 오디오 입출력을 담당합니다.
@@ -29,7 +31,8 @@
 - **PWM (LM386 오디오 앰프 출력):** `PA8` (TIM1_CH1)
 - **USART1 (보드 간 통신):** `PA10` (RX), `PA9` (TX)
 
-![ParkingDetect Pinout](C:/Users/kccistc/.gemini/antigravity-ide/brain/f4e4f954-744f-4035-8dd3-43e5f84abc04/parkingdetect_board_1788313455689.jpg)
+![ParkingDetect Pinout]<img width="1024" height="1024" alt="parkingdetect_board_1788313455689" src="https://github.com/user-attachments/assets/9ceefb21-0ac9-43fc-a021-b024d49cc90c" />
+
 
 ### 3. plMachine 보드 (차단기 구동 및 출입구 초음파 감지)
 주차장 진출입구의 통행량을 관리하고 차단기 모터를 제어합니다.
@@ -40,8 +43,7 @@
   - 입차 차단기 PWM: `PB8` (TIM4_CH3)
   - 출차 차단기 PWM: `PB9` (TIM4_CH4)
 
-![plMachine Pinout](C:/Users/kccistc/.gemini/antigravity-ide/brain/f4e4f954-744f-4035-8dd3-43e5f84abc04/plmachine_board_1788313465761.jpg)
-
+![plMachine Pinout]<img width="1024" height="1024" alt="plmachine_board_1788313465761" src="https://github.com/user-attachments/assets/ca1ba18e-fba2-4c73-a7eb-2653a18cc89c" />
 ---
 
 ## ✨ 주요 기능 (Key Features)
