@@ -1,5 +1,4 @@
 
-https://github.com/user-attachments/assets/991c1fae-a8eb-4b34-9bf1-2fc859bb83b0
 
 # 🚗 스마트 주차 관리 시스템 (Smart Parking Management System)
 
