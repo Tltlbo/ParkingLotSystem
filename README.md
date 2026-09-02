@@ -1,7 +1,11 @@
 
+https://github.com/user-attachments/assets/991c1fae-a8eb-4b34-9bf1-2fc859bb83b0
+
 # 🚗 스마트 주차 관리 시스템 (Smart Parking Management System)
 
 현대 사회의 심화되는 주차난과 주차장 이용의 불편함을 해소하기 위해 기획된 **스마트 주차 관리 시스템**입니다. 초음파 센서 기반의 주차 공간 감지, 2중 차단기 인터록(Interlock) 제어, 비상 인터폰 시스템 및 실시간 주차 위치 추천 알고리즘을 통합하여 효율적이고 안전한 주차 환경을 제공합니다.
+
+ |<img width="1024" height="1024" alt="IMG_3749" src="https://github.com/user-attachments/assets/1b5e0d66-8778-4f56-a22a-ffd2cf9da28c" />
 
 ## 👥 팀원 및 역할 분담 (Team Roles)
 - **박진성 (팀장):** 주차 자리 감지 구현, UART 송수신 파이프라인 및 인터폰 기능 구현
@@ -65,6 +69,19 @@
 - **LED 표출:** 계산된 추천 구역(예: `[ B-01 ]`)을 I2C 패킷으로 전송하여 즉각 화면에 업데이트합니다.
 
 ---
+
+## 기능 별 테스트 상황
+
+| 정상 입출차 | 인터락 상황 |
+| :---: | :---: |
+| <img src="https://github.com/user-attachments/assets/0861b95c-7401-4254-857b-fd95858eb5bf" width="240" /> | <img src="https://github.com/user-attachments/assets/479441d8-94fa-405d-937c-9c230ce6876a" width="240" /> |
+| **마이크 및 차단봉 임의 조작** | **주차 감지** |
+| <img src="https://github.com/user-attachments/assets/2c07f239-722a-44b7-9a03-b7e5223ed6fa" width="240" /> | <img src="https://github.com/user-attachments/assets/d8d2586d-72a4-4b98-9984-2b322b77dd68" width="380" />
+
+
+
+
+
 
 ## 🚀 트러블슈팅 (Troubleshooting)
 
